@@ -67,6 +67,8 @@ export interface RooftopProp {
   extra?: string;
 }
 
+export type GrapplePhase = 'none' | 'firing' | 'attached';
+
 export interface Batarang {
   id: string;
   x: number;
@@ -74,8 +76,16 @@ export interface Batarang {
   vx: number;
   vy: number;
   rotation: number;
+  spinSpeed: number;
   lifetime: number;
   hit: boolean;
+  distanceTraveled: number;
+  maxDistance: number;
+  returning: boolean;
+  damage: number;
+  piercedIds: string[];
+  homingTargetId: string | null;
+  trail: Point[];
 }
 
 export interface Particle {
@@ -128,12 +138,49 @@ export interface BatmanState {
   batarangCooldown: number; // 0 to 1
   combo: number;
   comboTimer: number;
-  // Grappling hook details
+  // Grappling hook details — pendulum + reel physics
   grappleActive: boolean;
   grappleTarget: Point | null;
   grappleAnchorId: string | null;
-  grappleProgress: number; // 0 to 1
+  grappleProgress: number; // 0 to 1 (legacy, kept for HUD)
   grappleLength: number;
+  grapplePhase: GrapplePhase;
+  grappleHook: Point | null; // flying hook head position
+  grappleRopeLength: number; // current constraint length while attached
+}
+
+export type RobinPhase = 'hidden' | 'arrive' | 'follow' | 'fight' | 'leave';
+
+export interface RobinState {
+  active: boolean;
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  facing: 1 | -1;
+  phase: RobinPhase;
+  timer: number; // frames in current phase
+  cooldown: number; // frames until next assist
+  targetId: string | null;
+  punchTimer: number;
+  animT: number;
+}
+
+export interface LevelMeta {
+  index: number;
+  name: string;
+  subtitle: string;
+  hostiles: number;
+  difficulty: string;
+  tag: string;
+}
+
+export interface LevelData {
+  rooftops: Rooftop[];
+  enemies: Enemy[];
+  levelLength: number;
+  targetX: number;
+  meta: LevelMeta;
 }
 
 export interface GameStats {
@@ -143,4 +190,6 @@ export interface GameStats {
   grapplesUsed: number;
   batarangsThrown: number;
   maxCombo: number;
+  robinAssists: number;
+  robinActive: boolean;
 }
