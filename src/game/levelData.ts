@@ -2,7 +2,8 @@ import { Rooftop, Enemy, LevelData, LevelMeta } from './types';
 
 export const LEVELS: LevelMeta[] = [
   { index: 0, name: 'NIGHT PATROL', subtitle: 'District 07 rooftops', hostiles: 7, difficulty: 'PATROL', tag: 'LVL 01' },
-  { index: 1, name: 'NIGHT SIEGE', subtitle: 'Narrows blackout zone', hostiles: 13, difficulty: 'SIEGE', tag: 'LVL 02' },
+  { index: 1, name: 'NIGHT SIEGE', subtitle: 'Narrows blackout zone', hostiles: 15, difficulty: 'SIEGE', tag: 'LVL 02' },
+  { index: 2, name: 'BREAKING THE BAT', subtitle: 'Bane holds the foundry', hostiles: 13, difficulty: 'BOSS', tag: 'LVL 03' },
 ];
 
 function thug(
@@ -272,8 +273,120 @@ function buildLevel2(): LevelData {
 }
 
 export function createLevel(index: number): LevelData {
+  if (index === 2) return buildLevel3();
   if (index === 1) return buildLevel2();
   return buildLevel1();
+}
+
+// LEVEL 03 — BREAKING THE BAT: short approach, Bane's foundry arena,
+// venom guards, sniper overwatch, then the pit with Bane himself (6 HP).
+function buildLevel3(): LevelData {
+  const rooftops: Rooftop[] = [
+    {
+      id: 'b3_roof_1', x: 60, y: 480, width: 400, height: 400,
+      name: 'SIONIS FOUNDRY // ASH GATE', type: 'industrial',
+      props: [
+        { type: 'antenna', x: 160, y: 430, width: 12, height: 50 },
+        { type: 'vent', x: 280, y: 458, width: 42, height: 22 },
+        { type: 'gargoyle', x: 420, y: 455, width: 30, height: 28 },
+      ],
+      anchors: [
+        { id: 'b3_a11', x: 230, y: 425, type: 'antenna', label: 'ASH MAST', rooftopIndex: 0 },
+        { id: 'b3_a12', x: 435, y: 460, type: 'gargoyle', label: 'GATE GARGOYLE', rooftopIndex: 0 },
+      ],
+    },
+    {
+      id: 'b3_roof_2', x: 560, y: 510, width: 380, height: 370,
+      name: 'SLAG ROW // CONVEYOR DECK', type: 'brick',
+      props: [
+        { type: 'pipes', x: 620, y: 495, width: 60, height: 15 },
+        { type: 'vent', x: 780, y: 485, width: 44, height: 25 },
+      ],
+      anchors: [
+        { id: 'b3_a21', x: 585, y: 502, type: 'ledge', label: 'DECK CORNICE', rooftopIndex: 1 },
+        { id: 'b3_a22', x: 760, y: 478, type: 'vent', label: 'SLAG STACK', rooftopIndex: 1 },
+        { id: 'b3_a23', x: 915, y: 502, type: 'ledge', label: 'DECK HOOK', rooftopIndex: 1 },
+      ],
+    },
+    {
+      id: 'b3_roof_3', x: 1040, y: 410, width: 440, height: 470,
+      name: 'VENOM PRESS // MIXING HALL', type: 'industrial',
+      props: [
+        { type: 'water_tower', x: 1160, y: 300, width: 80, height: 110 },
+        { type: 'billboard', x: 1300, y: 300, width: 150, height: 66, extra: 'VENOM' },
+        { type: 'antenna', x: 1420, y: 360, width: 14, height: 50 },
+      ],
+      anchors: [
+        { id: 'b3_a31', x: 1065, y: 402, type: 'gargoyle', label: 'HALL WEST', rooftopIndex: 2 },
+        { id: 'b3_a32', x: 1200, y: 298, type: 'crane', label: 'PRESS RIG', rooftopIndex: 2 },
+        { id: 'b3_a33', x: 1455, y: 402, type: 'ledge', label: 'HALL EAST', rooftopIndex: 2 },
+      ],
+    },
+    {
+      id: 'b3_roof_4', x: 1580, y: 520, width: 400, height: 360,
+      name: 'CRUCIBLE YARD // LADLE ROW', type: 'brick',
+      props: [
+        { type: 'vent', x: 1660, y: 495, width: 44, height: 25 },
+        { type: 'skylight', x: 1800, y: 512, width: 70, height: 8 },
+      ],
+      anchors: [
+        { id: 'b3_a41', x: 1600, y: 512, type: 'ledge', label: 'YARD WEST', rooftopIndex: 3 },
+        { id: 'b3_a42', x: 1780, y: 488, type: 'vent', label: 'YARD STACK', rooftopIndex: 3 },
+        { id: 'b3_a43', x: 1955, y: 512, type: 'ledge', label: 'YARD EAST', rooftopIndex: 3 },
+      ],
+    },
+    {
+      id: 'b3_roof_5', x: 2080, y: 400, width: 460, height: 480,
+      name: 'GOTHAM STEEL // FURNACE CROWN', type: 'concrete',
+      props: [
+        { type: 'antenna', x: 2180, y: 340, width: 15, height: 60 },
+        { type: 'gargoyle', x: 2090, y: 380, width: 30, height: 25 },
+        { type: 'billboard', x: 2280, y: 290, width: 160, height: 72, extra: 'GOTHAM STEEL' },
+      ],
+      anchors: [
+        { id: 'b3_a51', x: 2100, y: 390, type: 'gargoyle', label: 'CROWN WEST', rooftopIndex: 4 },
+        { id: 'b3_a52', x: 2360, y: 282, type: 'billboard', label: 'CROWN GANTRY', rooftopIndex: 4 },
+        { id: 'b3_a53', x: 2515, y: 390, type: 'ledge', label: 'CROWN EAST', rooftopIndex: 4 },
+      ],
+    },
+    {
+      id: 'b3_roof_6', x: 2640, y: 440, width: 720, height: 450,
+      name: 'THE PIT // BANE\u2019S FOUNDRY FLOOR', type: 'cathedral',
+      props: [
+        { type: 'gargoyle', x: 2660, y: 415, width: 35, height: 30 },
+        { type: 'billboard', x: 2920, y: 320, width: 170, height: 80, extra: 'BREAK THE BAT' },
+        { type: 'vent', x: 2800, y: 415, width: 44, height: 25 },
+        { type: 'antenna', x: 3280, y: 360, width: 18, height: 80 },
+      ],
+      anchors: [
+        { id: 'b3_a61', x: 2670, y: 428, type: 'gargoyle', label: 'PIT GARGOYLE', rooftopIndex: 5 },
+        { id: 'b3_a62', x: 3005, y: 310, type: 'crane', label: 'CRUCIBLE SPIRE', rooftopIndex: 5 },
+        { id: 'b3_a63', x: 3330, y: 430, type: 'ledge', label: 'PIT BALCONY', rooftopIndex: 5 },
+      ],
+    },
+  ];
+
+  const enemies: Enemy[] = [
+    thug('b3_e1', 700, 510, 600, 840, 'FOUNDRY THUG', 1, 1.0, 1),
+    thug('b3_e2', 820, 510, 600, 880, 'FOUNDRY BRUTE', 2, 0.7, -1),
+    gunman('b3_e3', 1300, 410, 'MIXING SNIPER'),
+    thug('b3_e4', 1180, 410, 1090, 1310, 'VENOM MIXER'),
+    gunman('b3_e5', 1400, 410, 'HALL MARKSMAN', 1),
+    thug('b3_e6', 1700, 520, 1620, 1820, 'LADLE GUARD', 1, 1.0, -1),
+    thug('b3_e7', 1840, 520, 1780, 1920, 'LADLE BRUTE', 2, 0.7, 1),
+    gunman('b3_e8', 2300, 400, 'FURNACE SNIPER'),
+    thug('b3_e9', 2200, 400, 2120, 2340, 'FURNACE GUARD'),
+    thug('b3_e10', 2720, 440, 2670, 2820, 'PIT DOORKEEPER', 2, 0.9, -1),
+    thug('b3_e11', 3240, 440, 3180, 3300, 'PIT DOORKEEPER', 2, 0.9, -1),
+    {
+      id: 'bane', type: 'bane', x: 3000, y: 440, width: 46, height: 84,
+      vx: 0, vy: 0, patrolMinX: 2900, patrolMaxX: 3120, facing: -1, state: 'patrol',
+      health: 6, maxHealth: 6, alertTimer: 200, aimTimer: 0,
+      knockoutTimer: 0, hitEffectTimer: 0, name: 'BANE // VENOM TITAN',
+    },
+  ];
+
+  return { rooftops, enemies, levelLength: 3400, targetX: 3000, meta: { ...LEVELS[2], hostiles: enemies.length } };
 }
 
 // Back-compat for existing engine/tests

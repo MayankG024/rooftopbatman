@@ -22,6 +22,20 @@ export interface GameEngineCallbacks {
   onGameOver: () => void;
 }
 
+// Batman combat/traversal dialogue pools — short, grim, caption-style
+const BAT_STRIKE = [
+  'Justice.', 'Stay down.', 'Outmatched.', 'Night night.', 'I am the night.', 'Gotham thanks you.',
+] as const;
+const BAT_TAKEDOWN = [
+  'One less predator.', 'The night takes you.', 'Done.', 'Sleep it off.',
+] as const;
+const BAT_HURT = ['Been through worse.', 'Not enough.', 'Is that all?'] as const;
+const BAT_GLIDE = ['I own this sky.', 'The city is mine tonight.', 'Up we go.'] as const;
+const BAT_ROBIN = ['Good work, Robin.', 'Stay sharp.', 'Together. Watch my flank.'] as const;
+const BAT_BANE = ['Bane.', 'Time to break the breaking.'] as const;
+const BAT_BANE_SURGE = ['Your venom makes you sloppy.', 'Roided circus act.'] as const;
+const BAT_BANE_DOWN = ['The venom runs out. So do you.', 'Gotham stands. You fall.'] as const;
+
 export class GothamEngine {
   public canvas: HTMLCanvasElement;
   public ctx: CanvasRenderingContext2D;
@@ -62,6 +76,9 @@ export class GothamEngine {
   private trafficDots: { x: number; speed: number; y: number; color: string }[] = [];
   private statThrottle: number = 0;
   private splashTimer: number = 0;
+  // Batman dialogue / voiceover pacing (frames until next spoken line)
+  private dialogueCooldown: number = 0;
+  private strikeCount: number = 0;
 
   // Targeting & Controls
   public mousePos: Point = { x: 0, y: 0 };
@@ -165,6 +182,8 @@ export class GothamEngine {
     };
     this.isCompleted = false;
     this.statThrottle = 0;
+    this.dialogueCooldown = 0;
+    this.strikeCount = 0;
     this.stats = {
       timeElapsed: 0,
       hostilesDefeated: 0,
@@ -176,6 +195,7 @@ export class GothamEngine {
       robinActive: false,
     };
     this.initTraffic();
+    this.speakPlan();
   }
 
   public loadLevel(index: number) {
@@ -418,6 +438,7 @@ export class GothamEngine {
       b.animTimer = 0;
       soundManager.playJump();
       this.addComicPopup(b.x, b.y - 46, 'VAULT BOOST!', '#e5a93c');
+      if (Math.random() < 0.4) this.batSay(this.batLine(BAT_GLIDE), false);
       for (let i = 0; i < 10; i++) {
         this.particles.push({
           x: b.x + (Math.random() - 0.5) * 24,
@@ -476,7 +497,7 @@ export class GothamEngine {
       let diff = Math.abs(ang - aimAngle);
       if (diff > Math.PI) diff = Math.PI * 2 - diff;
       if (diff > 1.1) continue; // ~63° cone
-      const score = 600 - dist - diff * 220 + (e.type === 'target' ? 80 : 0);
+      const score = 600 - dist - diff * 220 + (e.type === 'target' || e.type === 'bane' ? 80 : 0);
       if (score > bestScore) {
         bestScore = score;
         best = e;
@@ -583,10 +604,15 @@ export class GothamEngine {
       if (inFront && dy < 50) {
         // Lunge + knockback — weighty Arkham feel
         this.batman.vx += this.batman.facing * 1.6;
-        enemy.x += this.batman.facing * 7;
-        enemy.vx = this.batman.facing * 1.2;
+        enemy.x += this.batman.facing * (enemy.type === 'bane' ? 1.5 : 7);
+        enemy.vx = this.batman.facing * (enemy.type === 'bane' ? 0.2 : 1.2);
         this.damageEnemy(enemy, 1, 'STRIKE');
         hitAny = true;
+        // Batman quip every few strikes — voice kept rare so fights stay readable
+        this.strikeCount++;
+        if (this.strikeCount % 3 === 0) {
+          this.batSay(this.batLine(BAT_STRIKE), Math.random() < 0.3);
+        }
       }
     }
 
@@ -904,8 +930,13 @@ export class GothamEngine {
       enemy.knockoutTimer = 9999;
       this.stats.hostilesDefeated++;
       this.addComicPopup(enemy.x, enemy.y - 60, 'NEUTRALIZED', '#38bdf8');
+      // Closing line on every takedown — the one voiceover players will remember
+      this.batSay(
+        enemy.type === 'bane' ? this.batLine(BAT_BANE_DOWN) : this.batLine(BAT_TAKEDOWN),
+        true,
+      );
 
-      if (enemy.type === 'target') {
+      if (enemy.type === 'target' || enemy.type === 'bane') {
         this.triggerMissionComplete();
       }
     }
@@ -919,6 +950,8 @@ export class GothamEngine {
     this.screenShake = 10;
     soundManager.playHit();
     this.addComicPopup(this.batman.x, this.batman.y - 50, 'ARMOR HIT', '#ef4444');
+    // Gritted-teeth retort — cooldown keeps it from overlapping takedown lines
+    if (Math.random() < 0.5) this.batSay(this.batLine(BAT_HURT), true);
 
     if (this.batman.health <= 0) {
       // Emergency smoke & revive with 1 armor on nearest safe ledge
@@ -982,6 +1015,30 @@ export class GothamEngine {
     });
   }
 
+  // ---- Batman dialogue: gritty one-liners as gray caption popups,
+  // with occasional gravelly voiceover (cooldown-gated, mute-aware) ----
+  private batSay(text: string, voice = false) {
+    this.addComicPopup(this.batman.x, this.batman.y - 88, text, '#e2e8f0');
+    if (voice && this.dialogueCooldown <= 0) {
+      this.dialogueCooldown = 420; // ~7s between spoken lines
+      soundManager.speak(text);
+    }
+  }
+
+  private batLine(pool: readonly string[]): string {
+    return pool[(Math.random() * pool.length) | 0];
+  }
+
+  private speakPlan() {
+    const plans = [
+      'Plan: sweep the rooftops, cut through their scouts, take the courier alive.',
+      'Plan: the Narrows are dark. Stay low, hit fast, leave no sentry standing.',
+      'Bane broke out of Blackgate on venom. Plan: wear him down, dodge the charge, end this.',
+    ] as const;
+    this.batSay(plans[this.levelIndex] ?? plans[0], true);
+    this.dialogueCooldown = 600; // let the plan breathe before combat lines
+  }
+
   // Main Loop
   private gameLoop = (timestamp: number) => {
     if (!this.isRunning) return;
@@ -1020,6 +1077,9 @@ export class GothamEngine {
         this.batman.combo = 0;
       }
     }
+
+    // Dialogue voiceover pacing
+    if (this.dialogueCooldown > 0) this.dialogueCooldown--;
 
     // Coyote + jump buffer timers (forgiving mobile controls)
     if (this.batman.grounded) this.coyoteTimer = 9;
@@ -1455,6 +1515,129 @@ export class GothamEngine {
           }
         }
       }
+
+      // BANE — final boss: stomps forward, telegraphs a shoulder charge,
+      // slams the ground up close, venom-surges at half health
+      if (enemy.type === 'bane') {
+        const surged = enemy.surged === true;
+        const walkSpeed = surged ? 1.5 : 0.9;
+        enemy.facing = dxToBatman > 0 ? 1 : -1;
+
+        // First sighting — Batman names him
+        if (!enemy.aggroed && distToBatman < 460 && Math.abs(dyToBatman) < 120) {
+          enemy.aggroed = true;
+          this.addComicPopup(enemy.x, enemy.y - 100, 'BANE BREAKS YOU!', '#ef4444');
+          this.batSay(this.batLine(BAT_BANE), true);
+          soundManager.playAlert();
+        }
+
+        // Venom surge at half health — faster, angrier
+        if (!surged && enemy.health <= enemy.maxHealth / 2) {
+          enemy.surged = true;
+          enemy.alertTimer = 0; // charge immediately — no breather
+          this.addComicPopup(enemy.x, enemy.y - 100, 'VENOM SURGE!', '#22c55e');
+          this.batSay(this.batLine(BAT_BANE_SURGE), true);
+          this.screenShake = Math.max(this.screenShake, 8);
+          for (let i = 0; i < 16; i++) {
+            this.particles.push({
+              x: enemy.x + (Math.random() - 0.5) * 50,
+              y: enemy.y - 20 - Math.random() * 50,
+              vx: (Math.random() - 0.5) * 5,
+              vy: -2 - Math.random() * 4,
+              size: 3.5,
+              color: '#4ade80',
+              alpha: 1,
+              decay: 0.04,
+              type: 'spark',
+            });
+          }
+        }
+
+        if (enemy.state === 'attacking') {
+          // Charge sequence: aimTimer counts telegraph, then the dash
+          enemy.aimTimer -= 1;
+          if (enemy.aimTimer > 26) {
+            // Telegraph — Bane crouches, shaking the roof
+            this.screenShake = Math.max(this.screenShake, 2);
+            if (Math.random() < 0.4) {
+              this.particles.push({
+                x: enemy.x + (Math.random() - 0.5) * 44,
+                y: enemy.y,
+                vx: (Math.random() - 0.5) * 2,
+                vy: -Math.random() * 2,
+                size: 3,
+                color: 'rgba(180,190,210,0.5)',
+                alpha: 0.9,
+                decay: 0.07,
+                type: 'smoke',
+              });
+            }
+          } else if (enemy.aimTimer > 0) {
+            // THE CHARGE — trampling dash
+            enemy.x += enemy.facing * (surged ? 7.5 : 6);
+            if (Math.random() < 0.5) {
+              this.particles.push({
+                x: enemy.x - enemy.facing * 20,
+                y: enemy.y - 6,
+                vx: -enemy.facing * 3,
+                vy: -Math.random() * 2,
+                size: 4,
+                color: 'rgba(160,170,190,0.5)',
+                alpha: 0.8,
+                decay: 0.06,
+                type: 'smoke',
+              });
+            }
+            // Trample Batman on contact
+            if (distToBatman < 52 && Math.abs(dyToBatman) < 60) {
+              this.damageBatman(1);
+              this.batman.vx = enemy.facing * 10;
+              this.batman.vy = -6;
+              this.batman.grounded = false;
+              enemy.aimTimer = 0;
+            }
+          } else {
+            enemy.state = 'alert';
+            enemy.alertTimer = surged ? 200 : 300; // charge cooldown (~3–5s)
+          }
+        } else if (distToBatman < 480 && Math.abs(dyToBatman) < 130) {
+          enemy.state = 'alert';
+          // Stomp toward Batman
+          enemy.x += enemy.facing * walkSpeed;
+          // Ground slam up close — AoE around Bane, dodge by gliding away
+          if (distToBatman < 78 && Math.abs(dyToBatman) < 60 && Math.random() < (surged ? 0.05 : 0.035)) {
+            this.screenShake = Math.max(this.screenShake, 9);
+            soundManager.playHit();
+            this.addComicPopup(enemy.x, enemy.y - 100, 'BANE SLAM!', '#ef4444');
+            for (let i = 0; i < 18; i++) {
+              const a = (i / 18) * Math.PI * 2;
+              this.particles.push({
+                x: enemy.x, y: enemy.y - 4,
+                vx: Math.cos(a) * (3 + Math.random() * 3),
+                vy: -Math.random() * 5,
+                size: 4,
+                color: i % 3 ? '#f3c15d' : '#94a3b8',
+                alpha: 1,
+                decay: 0.05,
+                type: 'spark',
+              });
+            }
+            if (this.batman.grounded) this.damageBatman(1);
+          }
+          // Start a charge when Batman keeps his distance
+          enemy.alertTimer = Math.max(0, enemy.alertTimer - 1);
+          if (enemy.alertTimer <= 0 && distToBatman > 130 && distToBatman < 340) {
+            enemy.state = 'attacking';
+            enemy.aimTimer = 52; // telegraph + dash window
+            this.addComicPopup(enemy.x, enemy.y - 100, '!', '#ef4444');
+            soundManager.playAlert();
+          }
+        } else {
+          enemy.state = 'patrol';
+          // Idle sway on his arena
+          enemy.x += Math.sin(this.batman.animTimer * 0.8 + enemy.patrolMinX) * 0.15;
+        }
+      }
     }
   }
 
@@ -1524,6 +1707,7 @@ export class GothamEngine {
         r.targetId = prey.id;
         r.punchTimer = 0;
         this.addComicPopup(r.x, r.y - 72, 'BOY WONDER!', '#4ade80');
+        this.batSay(this.batLine(BAT_ROBIN), true);
       } else if (r.timer > 900) {
         r.phase = 'leave';
         r.timer = 0;
@@ -2707,17 +2891,167 @@ export class GothamEngine {
         ctx.fillRect(12, -32, 14, 12);
         ctx.fillStyle = '#e5a93c';
         ctx.fillRect(15, -28, 8, 3); // Stolen intel glow
+      } else if (enemy.type === 'bane') {
+        // BANE — luchador mask, venom rig, bare muscle torso, suspenders
+        const surged = enemy.surged === true;
+        const charging = enemy.state === 'attacking' && enemy.aimTimer <= 26;
+        const crouch = enemy.state === 'attacking' && enemy.aimTimer > 26 ? 5 : 0;
+        const skin = this.isDetectiveMode ? '#5b6b85' : '#d9a077';
+        const skinShade = this.isDetectiveMode ? '#3c4a61' : '#a86a42';
+        const pants = this.isDetectiveMode ? '#1e293b' : '#14181f';
+
+        // Legs — thick black combat pants
+        ctx.fillStyle = pants;
+        ctx.fillRect(-16 + crouch * 0.4, -26, 13, 26);
+        ctx.fillRect(3 - crouch * 0.4, -26, 13, 26);
+        // Boots
+        ctx.fillStyle = '#05070b';
+        ctx.fillRect(-18 + crouch * 0.4, -8, 17, 8);
+        ctx.fillRect(1 - crouch * 0.4, -8, 17, 8);
+
+        // Torso — bare muscle with shading + suspenders
+        const torsoGrad = ctx.createLinearGradient(-20, 0, 20, 0);
+        torsoGrad.addColorStop(0, skinShade);
+        torsoGrad.addColorStop(0.5, skin);
+        torsoGrad.addColorStop(1, skinShade);
+        ctx.fillStyle = torsoGrad;
+        ctx.beginPath();
+        ctx.moveTo(-21, -64 + crouch);
+        ctx.lineTo(21, -64 + crouch);
+        ctx.lineTo(17, -26);
+        ctx.lineTo(-17, -26);
+        ctx.closePath();
+        ctx.fill();
+        // Pecs + abs
+        ctx.strokeStyle = 'rgba(60,25,10,0.55)';
+        ctx.lineWidth = 1.4;
+        ctx.beginPath();
+        ctx.moveTo(-19, -54 + crouch);
+        ctx.quadraticCurveTo(0, -48 + crouch, 19, -54 + crouch);
+        ctx.moveTo(-15, -44 + crouch);
+        ctx.lineTo(15, -44 + crouch);
+        ctx.moveTo(-13, -36 + crouch);
+        ctx.lineTo(13, -36 + crouch);
+        ctx.moveTo(0, -50 + crouch);
+        ctx.lineTo(0, -30 + crouch);
+        ctx.stroke();
+        // Black suspenders + belt
+        ctx.fillStyle = '#0a0c10';
+        ctx.fillRect(-14, -64 + crouch, 5, 38);
+        ctx.fillRect(9, -64 + crouch, 5, 38);
+        ctx.fillStyle = '#232a36';
+        ctx.fillRect(-18, -28, 36, 5);
+        ctx.fillStyle = surged ? '#4ade80' : '#e5a93c';
+        ctx.fillRect(-4, -27, 8, 3); // venom belt buckle
+
+        // Arms — massive, fists like wrecking balls
+        const armSwing = charging ? 6 : Math.sin(this.batman.animTimer * 3 + enemy.x) * 2;
+        ctx.fillStyle = skin;
+        ctx.fillRect(-30, -60 + crouch + armSwing * 0.4, 11, 30); // left upper
+        ctx.fillRect(19, -60 + crouch - armSwing * 0.4, 11, 30); // right upper
+        // Knuckle straps
+        ctx.fillStyle = '#0a0c10';
+        ctx.fillRect(-30, -44 + crouch, 11, 4);
+        ctx.fillRect(19, -44 + crouch, 11, 4);
+        // Fists
+        ctx.fillStyle = skinShade;
+        ctx.beginPath();
+        ctx.arc(-24, -24 + crouch, 8.5, 0, Math.PI * 2);
+        ctx.arc(24, -24 + crouch, 8.5, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Venom canister + tubes on the back (drawn behind shoulders)
+        ctx.fillStyle = '#1c2431';
+        ctx.fillRect(-9, -72 + crouch, 18, 10);
+        ctx.fillStyle = surged ? '#4ade80' : '#2f9e57';
+        ctx.fillRect(-7, -70 + crouch, 14, 3);
+        ctx.strokeStyle = '#0d1117';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(-7, -66 + crouch);
+        ctx.quadraticCurveTo(-16, -60 + crouch, -13, -50 + crouch);
+        ctx.moveTo(7, -66 + crouch);
+        ctx.quadraticCurveTo(16, -60 + crouch, 13, -50 + crouch);
+        ctx.stroke();
+
+        // Head — black luchador mask, white trim, red eyes, forehead tubes
+        ctx.fillStyle = '#0d0f14';
+        ctx.beginPath();
+        ctx.arc(0, -73 + crouch, 11, 0, Math.PI * 2);
+        ctx.fill();
+        // White mask trim
+        ctx.strokeStyle = '#d7dde8';
+        ctx.lineWidth = 1.8;
+        ctx.beginPath();
+        ctx.moveTo(-8, -80 + crouch);
+        ctx.lineTo(-4, -72 + crouch);
+        ctx.lineTo(-8, -66 + crouch);
+        ctx.moveTo(8, -80 + crouch);
+        ctx.lineTo(4, -72 + crouch);
+        ctx.lineTo(8, -66 + crouch);
+        ctx.stroke();
+        // Forehead venom strip
+        ctx.fillStyle = '#232a36';
+        ctx.fillRect(-3, -86 + crouch, 6, 8);
+        ctx.fillStyle = surged ? '#4ade80' : '#7dd3a8';
+        for (let vy = -85 + crouch; vy < -79 + crouch; vy += 2.4) {
+          ctx.fillRect(-2, vy, 4, 1.2);
+        }
+        // Red eyes (glow when surged / charging)
+        const eyeGlow = surged || charging;
+        if (eyeGlow) {
+          ctx.shadowColor = '#ef4444';
+          ctx.shadowBlur = 12;
+        }
+        ctx.fillStyle = '#ef2b2b';
+        ctx.beginPath();
+        ctx.moveTo(-7.5, -75 + crouch);
+        ctx.lineTo(-2.5, -73.5 + crouch);
+        ctx.lineTo(-6.5, -70.5 + crouch);
+        ctx.closePath();
+        ctx.moveTo(7.5, -75 + crouch);
+        ctx.lineTo(2.5, -73.5 + crouch);
+        ctx.lineTo(6.5, -70.5 + crouch);
+        ctx.closePath();
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        // Teeth grille
+        ctx.strokeStyle = '#d7dde8';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(-4, -64 + crouch);
+        ctx.lineTo(4, -64 + crouch);
+        ctx.stroke();
+
+        // Boss health bar
+        const bw = 64;
+        const frac = Math.max(0, enemy.health / enemy.maxHealth);
+        ctx.fillStyle = 'rgba(0,0,0,0.65)';
+        ctx.fillRect(-bw / 2, -98 + crouch, bw, 6);
+        ctx.fillStyle = surged ? '#4ade80' : '#ef4444';
+        ctx.fillRect(-bw / 2 + 1, -97 + crouch, (bw - 2) * frac, 4);
+        ctx.font = '8px "JetBrains Mono", monospace';
+        ctx.fillStyle = '#ef4444';
+        ctx.textAlign = 'center';
+        ctx.fillText('BANE', 0, -102 + crouch);
+        ctx.textAlign = 'left';
       }
 
       // Detective Vision Skeleton / Threat Box
       if (this.isDetectiveMode) {
-        ctx.strokeStyle = enemy.type === 'target' ? '#ef4444' : '#f97316';
+        const boss = enemy.type === 'target' || enemy.type === 'bane';
+        ctx.strokeStyle = boss ? '#ef4444' : '#f97316';
         ctx.lineWidth = 1.2;
-        ctx.strokeRect(-16, -65, 32, 65);
+        const isBane = enemy.type === 'bane';
+        ctx.strokeRect(isBane ? -26 : -16, isBane ? -98 : -65, isBane ? 52 : 32, isBane ? 98 : 65);
 
         ctx.font = '8px "JetBrains Mono", monospace';
-        ctx.fillStyle = enemy.type === 'target' ? '#ef4444' : '#f97316';
-        ctx.fillText(enemy.type === 'target' ? 'HIGH VALUE TARGET' : 'HOSTILE', -20, -70);
+        ctx.fillStyle = boss ? '#ef4444' : '#f97316';
+        ctx.fillText(
+          enemy.type === 'bane' ? 'FINAL BOSS' : enemy.type === 'target' ? 'HIGH VALUE TARGET' : 'HOSTILE',
+          isBane ? -26 : -20,
+          isBane ? -102 : -70,
+        );
       }
 
       ctx.restore();

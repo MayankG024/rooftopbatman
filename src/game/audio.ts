@@ -20,12 +20,48 @@ class SoundManager {
 
   public setEnabled(enabled: boolean) {
     this.enabled = enabled;
-    if (!enabled && this.ctx) {
-      if (this.ctx.state === 'running') {
+    if (!enabled) {
+      // Silence any spoken dialogue immediately
+      try {
+        if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+          window.speechSynthesis.cancel();
+        }
+      } catch {
+        /* speech not available */
+      }
+      if (this.ctx && this.ctx.state === 'running') {
         this.ctx.suspend().catch(() => {});
       }
     } else if (enabled && this.ctx) {
       this.ctx.resume().catch(() => {});
+    }
+  }
+
+  // Gravelly Batman voiceover via the platform speech engine.
+  // Best-effort: silent no-op where speech synthesis is unavailable.
+  // Rate/pitch are tuned low so the line reads grim, not chirpy.
+  public speak(text: string) {
+    if (!this.enabled) return;
+    try {
+      if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+      const synth = window.speechSynthesis;
+      // Don't stack lines — the latest call wins
+      if (synth.speaking) synth.cancel();
+      const utter = new SpeechSynthesisUtterance(text);
+      utter.rate = 0.82;
+      utter.pitch = 0.35;
+      utter.volume = 0.9;
+      utter.lang = 'en-US';
+      // Prefer a deep English voice when the platform exposes a list
+      const voices = synth.getVoices();
+      const deep =
+        voices.find((v) => v.lang.startsWith('en') && /daniel|david|james|george|guy|male/i.test(v.name)) ??
+        voices.find((v) => v.lang.startsWith('en-GB')) ??
+        voices.find((v) => v.lang.startsWith('en'));
+      if (deep) utter.voice = deep;
+      synth.speak(utter);
+    } catch {
+      /* speech not available */
     }
   }
 

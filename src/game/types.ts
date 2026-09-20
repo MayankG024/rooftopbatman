@@ -10,7 +10,7 @@ export interface Rect {
   height: number;
 }
 
-export type EnemyType = 'thug' | 'gunman' | 'target';
+export type EnemyType = 'thug' | 'gunman' | 'target' | 'bane';
 
 export type EnemyState = 'patrol' | 'alert' | 'aiming' | 'attacking' | 'knocked_out' | 'falling';
 
@@ -35,6 +35,9 @@ export interface Enemy {
   knockoutTimer: number;
   hitEffectTimer: number;
   name: string;
+  // Boss flags (Bane) — optional so existing constructors keep working
+  surged?: boolean;
+  aggroed?: boolean;
 }
 
 export interface GrappleAnchor {

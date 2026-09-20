@@ -34,6 +34,7 @@ export const MissionBriefing: React.FC<MissionBriefingProps> = ({ onStart }) => 
       }
       if (e.code === 'Digit1') onStart(0);
       if (e.code === 'Digit2') onStart(1);
+      if (e.code === 'Digit3') onStart(2);
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
@@ -99,18 +100,21 @@ export const MissionBriefing: React.FC<MissionBriefingProps> = ({ onStart }) => 
         </h1>
 
         <p className="mt-3 max-w-sm text-[12px] sm:text-[13px] leading-relaxed text-slate-400">
-          Intercept the courier across Gotham's rooftops.
+          {level === 2
+            ? 'Break into the foundry. Break Bane.'
+            : 'Intercept the courier across Gotham\u2019s rooftops.'}
         </p>
 
         {/* Level select — the only choice on this screen */}
-        <div className="mt-6 grid w-full max-w-md grid-cols-2 gap-2">
+        <div className="mt-6 grid w-full max-w-lg grid-cols-2 sm:grid-cols-3 gap-2">
           {LEVELS.map((m) => {
             const selected = level === m.index;
+            const span = m.index === LEVELS.length - 1 ? 'col-span-2 sm:col-span-1' : '';
             return (
               <button
                 key={m.index}
                 onClick={() => setLevel(m.index)}
-                className={`group rounded-xl border p-3 text-left transition-all cursor-pointer active:scale-[0.98] ${
+                className={`group rounded-xl border p-3 text-left transition-all cursor-pointer active:scale-[0.98] ${span} ${
                   selected
                     ? 'border-amber-400/80 bg-amber-400/10 shadow-[0_0_28px_rgba(229,169,60,0.3)]'
                     : 'border-slate-800 bg-black/60 hover:border-slate-600'
@@ -148,7 +152,7 @@ export const MissionBriefing: React.FC<MissionBriefingProps> = ({ onStart }) => 
           {isTouch ? (
             <span>D-PAD move · hold JUMP to glide · TAP reticles to grapple</span>
           ) : (
-            <span>A/D move · SPACE glide · E grapple · Q batarang · 1/2 level</span>
+            <span>A/D move · SPACE glide · E grapple · Q batarang · 1/2/3 level</span>
           )}
         </div>
         <div className="mt-1 flex items-center gap-1.5 text-[10px] text-slate-700">
